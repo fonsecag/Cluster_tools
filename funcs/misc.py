@@ -228,14 +228,15 @@ def z_from_npz_dataset(self, dataset):
 	z_n = [_z_to_z_str_dict[x] for x in z]
 	return z_n
 
-def weighted_error_branch_score(self, index, branches):
+def weighted_error_branch_score(self, branches):
 
+	print('\n')
 	print(f"{'Branch':<7}{'avg err':<9}{'size'}")
 
 	n_tot, err_pop = 0, 0
 	for i in range(len(branches)):
 		branch = branches[i]
-		err, pop = branches['err'], len(branches['ind'])
+		err, pop = branch['err'], len(branch['ind'])
 		err_pop += err*pop
 		n_tot += pop
 		print(f"{i:<7}{err:<9.2f}{pop}")

@@ -54,6 +54,9 @@ class SplitInterHandler(SplitModelHandler):
 				print_warning('More than 100 branching iterations, broke out')
 				break
 
+		# put models back out of temp
+		self.clear_cluster_dict_temp()
+
 		if self.call_para('split_models', 'classify'):
 			self.print_stage('Classification')
 			ClassificationHandler.prepare_classifier(self)
@@ -62,15 +65,24 @@ class SplitInterHandler(SplitModelHandler):
 			self.print_stage('Pre-predicting models')
 			self.preload_model_predictions()
 
+	def clear_cluster_dict_temp(self):
+		self.submodels = []
+		for i in range(len(self.cluster_dict)):
+			branch = self.cluster_dict[i]
+			temp_model = branch['model']
+			model = os.path.join(self.model_dir, f'model_{i}.{self.model_ext}')
+			shutil.move(temp_model, model)
+			self.submodels.append(model)
 
 	def print_branch_summary(self):
-		print_subtitle('Current branch summary')
+		print_subtitle('-------------- Current branch summary --------------')
 		print(f"{'N':<3}{'size':<8}{'err':<8}{'rej':<5}{'temp_file'}")
 
 		for i in range(len(self.cluster_dict)):
 			b = self.cluster_dict[i]
 			print(f"{i:<3}{len(b['ind']):<8}{b['err']:<8.2f}{b['rejected']:<5}"
 				f"{b['model']}")
+		print('----------------------------------------------------')
 
 	unique_id = 0
 	def unique_model_id(self):
@@ -101,8 +113,7 @@ class SplitInterHandler(SplitModelHandler):
 
 			branch['err'] = err
 		print_ongoing_process('Computed local errors', True)
-
-
+		return branches
 
 	def attempt_branching(self):
 
@@ -112,14 +123,19 @@ class SplitInterHandler(SplitModelHandler):
 			return False # this exits the while loop
 
 		## SPLIT BRANCH IF FOUND
-		branches = self.split_branch(index)
+		branches, valid = self.split_branch(index)
 
-		print_subtitle('Training branch')
-		branches = self.train_branch(branches)
+		if valid:
+			print_subtitle('Training branch')
+			branches = self.train_branch(branches)
 
-		print_subtitle('Checking errors and acceptance criterion')
-		branch = self.compute_local_errors(branches)
-		success = self.reject_accept_branch(index, branch)
+			print_subtitle('Checking errors and acceptance criterion')
+			branches = self.compute_local_errors(branches)
+			success = self.reject_accept_branch(index, branches)
+		else:
+			success = self.reject_accept_branch(index, branches, False)
+
+		self.print_branch_summary()
 
 		return True
 
@@ -130,7 +146,7 @@ class SplitInterHandler(SplitModelHandler):
 		return None
 
 	def split_branch(self, index):
-
+		valid = True
 		from funcs.cluster import cluster_do
 		scheme=self.call_para('fine_clustering','clustering_scheme')
 
@@ -140,7 +156,17 @@ class SplitInterHandler(SplitModelHandler):
 
 		branch = [{'ind':x, 'rejected':False, 'err':None, 'model':None}
 			for x in cl_ind_new]
-		return branch
+
+		# check valid min size
+		min_size = self.call_para('split_inter', 'accept_min_size')
+		if min_size is not None:
+			for x in branch:
+				if len(x['ind'])<min_size:
+					valid = False
+					print('Min size reached, rejected!')
+					break
+
+		return branch, valid
 		
 	def train_branch(self, branches):
 
@@ -155,8 +181,36 @@ class SplitInterHandler(SplitModelHandler):
 			self.train_load_submodel(model, branch['ind'])
 			branch['model'] = model
 
-	def reject_accept_branch(self, branches):
-		
+		return branches
+
+	def reject_accept_branch(self, index, branches, valid = True):
+
+		if valid:
+			new_score = self.call_para('split_inter', 'score_function',
+				args = [self, branches])
+			old_score = self.call_para('split_inter', 'score_function',
+				args = [self, [self.cluster_dict[index]]])
+
+		if (not valid) or (old_score < new_score): # lower score is better
+			self.cluster_dict[index]['rejected'] = True
+			print_ongoing_process('Rejected branch splitting', True)
+			return False 
+		else:
+			print_ongoing_process('Accepted branch splitting', True)
+
+
+		print_ongoing_process('Merging tree')
+		# accept the branch, integrate it into cluster_dict
+		cd = self.cluster_dict
+
+		# first replace the current index 
+		cd[index] = branches[0]
+		for i in range(1, len(branches)):
+			cd.insert(index + i, branches[i])
+
+		# update self.cluster_indices as well just in case
+		self.cluster_indices = [ x['ind'] for x in cd]
+		print_ongoing_process('Merging tree', True)
 
 	def print_local_errors(self):
 		err = self.sample_err 
@@ -170,111 +224,6 @@ class SplitInterHandler(SplitModelHandler):
 
 		print_table("Fine cluster error summary:",None,None,summary_table, width = 15)
 
-
-
-
-	# def create_split_models(self):
-	# 	n_models = len(self.cluster_indices)
-	# 	cl_ind = self.cluster_indices
-
-	# 	self.submodels = []
-	# 	for i in range(n_models):
-	# 		model_path = os.path.join(self.model_dir, f'model_{i}.{self.model_ext}')
-	# 		self.train_load_submodel(model_path, cl_ind[i])
-	# 		self.submodels.append(model_path)
-
-	# 	if self.call_para('split_models','mix_model'):
-	# 		model_path = os.path.join(self.storage_dir, f'model_mix.{self.model_ext}')
-	# 		self.train_load_submodel(model_path, None)
-	# 		self.mix_model = model_path
-	# 	else:
-	# 		self.mix_model = None
-
-	# def create_temp_dataset(self, cl_ind):
-
-	# 	from sgdml.utils.io import dataset_md5
-
-	# 	name=os.path.join(self.storage_dir,f"temp_dataset.npz")
-
-	# 	data=dict(self.dataset)
-	# 	for i in ['R','E','F']:
-	# 		data[i]=data[i][cl_ind]
-	# 	data['name']=name
-	# 	data['md5']=dataset_md5(data)
-
-	# 	np.savez_compressed(name,**data)
-
-	# 	return name
-
-	# def train_load_submodel(self, model_path, cl_ind):
-
-	# 	# indices is actually just the 'init' arg when first loading
-	# 	print_subtitle('Training submodel')
-
-	# 	if cl_ind is not None:
-	# 		N = len(cl_ind)
-	# 		print_ongoing_process(f"Preparing temporary dataset ({N} points)") 
-
-	# 		dataset_path = self.create_temp_dataset(cl_ind)
-	# 		dataset_tuple = (dataset_path, np.load(dataset_path))
-
-	# 		print_ongoing_process(f"Preparing temporary dataset ({N} points)")
-
-	# 	else:
-	# 		N = len(self.vars[0])
-	# 		print_ongoing_process(f"Preparing temporary dataset ({N} points)") 
-
-	# 		dataset_tuple = (self.args['dataset_file'], self.dataset)
-
-	# 		print_ongoing_process(f"Preparing temporary dataset ({N} points)")
-
-	# 	try:
-	# 		para = self.call_para('split_models','data_train_func_args')
-	# 		para = generate_custom_args(self, para)[0]
-	# 		N = para['n_train']
-
-	# 	except:
-	# 		N = '?'
-
-	# 	print_ongoing_process(f"Training model ({N} points)")
-
-	# 	self.call_para(
-	# 		'split_models','data_train_func',
-	# 		args = [self, dataset_tuple, model_path]
-	# 		)
-	# 	print_ongoing_process(f"Trained model ({N} points)", True)
-
-	# 	original_indices = self.call_para('split_models', 'original_indices')
-	# 	if original_indices:
-	# 		pass # toad
-
-	# def preload_model_predictions(self):
-
-	# 	predicts=[]
-
-	# 	for i in range(len(self.submodels)):
-	# 		args=[self, self.submodels[i], i,
-	# 			self.vars[self.call_para('split_models','preload_input_var')],
-	# 			self.call_para('split_models','preload_batch_size')]
-
-	# 		pred_i=self.call_para('split_models','preload_predict_func',args=args)
-	# 		predicts.append(pred_i)
-
-
-	# 	predicts=np.array(predicts)
-	# 	np.save( os.path.join(self.storage_dir,'pre_predict.npy'),predicts)
-
-
-	# 	if self.mix_model is not None:
-	# 		args=[self, self.mix_model, 'mix',
-	# 			self.vars[self.call_para('split_models','preload_input_var')],
-	# 			self.call_para('split_models','preload_batch_size')]
-
-	# 		pred=self.call_para('split_models','preload_predict_func',args=args)		
-	# 		np.save( os.path.join(self.storage_dir,'mix_pre_predict.npy'),pred)
-	# 	else:
-	# 		print_warning("No 'mix.npz' model found, cannot preload its prediction")	
-		
 	def save_command(self):
 		super().save_command()
 

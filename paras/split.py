@@ -31,8 +31,8 @@ parameters={
 		'sgdml_train_args':{
 			'n_train':50, # will be handled automatically where needed
 						   # for example for improved learning
-			'n_test':50,
-			'n_valid':50,
+			'n_test':1,
+			'n_valid':5,
 			'overwrite':True,
 			'command':'all',
 			'sigs':None,
@@ -48,12 +48,12 @@ parameters={
 	},
 
 	'split_models':{
-		'mix_model':True,
+		'mix_model':False,
 
 	},
 
 	'split_inter':{
-
+		'accept_min_size':57,
 	},
 
 }

@@ -357,7 +357,11 @@ parameters={
 		'local_batch_size':500,
 		'local_error_func':'func:root_mean_squared_error',
 
-		'score_function':'func:weighted_error_branch_score',
+		'accept_min_size':None,
+
+		'score_function':'func:weighted_error_branch_score', 
+		# lower score is better
+		# 
 	},
 
 }
