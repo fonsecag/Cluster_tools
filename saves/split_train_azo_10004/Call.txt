@@ -1,0 +1,1 @@
+Original call: split_train -d ../Data/datasets/azobenzene/azo_10004.npz -p split -c clusters/azo_10004_c2.npy
