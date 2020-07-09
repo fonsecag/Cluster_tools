@@ -83,7 +83,7 @@ class SplitModelHandler(ClusterErrorHandler):
 			dataset_path = self.create_temp_dataset(cl_ind)
 			dataset_tuple = (dataset_path, np.load(dataset_path))
 
-			print_ongoing_process(f"Preparing temporary dataset ({N} points)")
+			print_ongoing_process(f"Preparing temporary dataset ({N} points)", True)
 
 		else:
 			N = len(self.vars[0])
@@ -91,7 +91,7 @@ class SplitModelHandler(ClusterErrorHandler):
 
 			dataset_tuple = (self.args['dataset_file'], self.dataset)
 
-			print_ongoing_process(f"Preparing temporary dataset ({N} points)")
+			print_ongoing_process(f"Preparing temporary dataset ({N} points)", True)
 
 		try:
 			para = self.call_para('split_models','data_train_func_args')
@@ -101,13 +101,10 @@ class SplitModelHandler(ClusterErrorHandler):
 		except:
 			N = '?'
 
-		print_ongoing_process(f"Training model ({N} points)")
-
 		self.call_para(
 			'split_models','data_train_func',
 			args = [self, dataset_tuple, model_path]
 			)
-		print_ongoing_process(f"Trained model ({N} points)", True)
 
 		original_indices = self.call_para('split_models', 'original_indices')
 		if original_indices:
@@ -130,15 +127,16 @@ class SplitModelHandler(ClusterErrorHandler):
 		np.save( os.path.join(self.storage_dir,'pre_predict.npy'),predicts)
 
 
-		if self.mix_model is not None:
-			args=[self, self.mix_model, 'mix',
+		if (not self.resumed) and (self.mix_model is not None):
+			args=[self, self.mix_model,
 				self.vars[self.call_para('split_models','preload_input_var')],
 				self.call_para('split_models','preload_batch_size')]
 
 			pred=self.call_para('split_models','preload_predict_func',args=args)		
 			np.save( os.path.join(self.storage_dir,'mix_pre_predict.npy'),pred)
 		else:
-			print_warning("No 'mix.npz' model found, cannot preload its prediction")
+			print_warning("Either no 'mix.npz' model found, or job was "\
+				 "resumed. Cannot preload mix prediction")
 
 
 

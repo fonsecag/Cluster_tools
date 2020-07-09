@@ -25,13 +25,20 @@ class ClusterXYZHandler(ClusterHandler):
 		if not os.path.exists(dir_path):
 			os.mkdir(dir_path)
 
-		var_index = self.call_para('R_to_xyz', 'var_index')
-		R = self.vars[var_index]
+		var_index_R = self.call_para('R_to_xyz', 'var_index_R')
+		R = self.vars[var_index_R]
+
+		var_index_F = self.call_para('R_to_xyz', 'var_index_F')
+		F = self.vars[var_index_F]
+
+		var_index_E = self.call_para('R_to_xyz', 'var_index_E')
+		E = self.vars[var_index_E]
+
 
 		cl_ind = self.cluster_indices
 		for i in range(len(cl_ind)):
 			cl = cl_ind[i]
-			self.save_xyz_index(i, R[cl])
+			self.save_xyz_index(i, R[cl], F[cl], E[cl])
 
 	# def save_cluster_xyz(self):
 		# multithreading seemed pointless in the end because even though we're
@@ -64,24 +71,28 @@ class ClusterXYZHandler(ClusterHandler):
 	# 	for x in self.cl_xyz_threads:
 	# 		x.join()
 
-	def save_xyz_index(self, i, R):
+	def save_xyz_index(self, i, R, F, E):
 		file_name = f'cluster_{i}.xyz'
 		path = os.path.join(self.storage_dir, 'cluster_xyz', file_name)
 
 
 		file = open(path, 'w+')
-		for r_j in R:
-			s = self.R_to_xyz_single(r_j)
+		for j in range(len(R)):
+			r_j, f_j, e_j = R[j], F[j], E[j]
+			s = self.RFE_to_xyz_single(r_j, f_j, e_j)
 			file.write(s)
 
 		file.close()
 
-	def R_to_xyz_single(self, R):
-		z = self.z
-		s = f'{len(z)}\n#\n'
-		for i in range(0,len(R),3):
-			s += f"{z[i//3]:>8}{R[i]:>13.5e}{R[i+1]:>13.5e}{R[i+2]:>13.5e}\n"
+# Energy=-620726.002662 Properties=species:S:1:pos:R:3:forces:R:3
 
+	def RFE_to_xyz_single(self, R, F, E):
+		z = self.z
+		s = f'{len(z)}\n'
+		s += f'{E[0]:.5e}\n'
+		for i in range(0,len(R),3):
+			s += f"{z[i//3]:<3}{R[i]:<13.5e}{R[i+1]:<13.5e}{R[i+2]:<13.5e}"
+			s += f"{F[i]:<13.5e}{F[i+1]:<13.5e}{F[i+2]:<13.5e}\n"
 		return s
 
 	def save_command(self):

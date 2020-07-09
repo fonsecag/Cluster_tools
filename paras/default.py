@@ -1,7 +1,7 @@
 
 
 parameters={	
-	'n_cores':8, # negative numbers means number of total cores minus 
+	'n_cores':-2, # negative numbers means number of total cores minus 
 
 	'load_dataset':{
 		'post_processing':None,
@@ -22,47 +22,78 @@ parameters={
 		'init_scheme':[0, 1],
 		#indices below define the clustering scheme
 		0:{
-		    'type':'func:agglomerative_clustering', #string, types: Agglomerative, Kmeans
-		    'n_clusters':10,
-		    'initial_number':10000,
-		    'distance_matrix_function':'func:distance_matrix_euclidean',
-		    'linkage':'complete',
-		    'cluster_choice_criterion':'func:smallest_max_distance_euclidean',
-		    
-		    'var_index':0,
-		    },
+			'type':'func:agglomerative_clustering', #string, types: Agglomerative, Kmeans
+			'n_clusters':10,
+			'initial_number':20000,
+			'distance_matrix_function':'func:distance_matrix_euclidean',
+			'linkage':'complete',
+			'cluster_choice_criterion':'func:smallest_max_distance_euclidean',
+			
+			'var_index':0,
+			},
 		1:{
 			'type':'func:kmeans_clustering',
 			'n_clusters':5,
 			'var_index':3,
 		},
 		2:{
-		    'type':'func:agglomerative_clustering', #string, types: Agglomerative, Kmeans
-		    'n_clusters':100,
-		    'initial_number':10000,
-		    'distance_matrix_function':'func:distance_matrix_euclidean',
-		    'linkage':'complete',
-		    'cluster_choice_criterion':'func:smallest_max_distance_euclidean',
-		    
-		    'var_index':0,
-		    },
+			'type':'func:agglomerative_clustering', #string, types: Agglomerative, Kmeans
+			'n_clusters':100,
+			'initial_number':10000,
+			'distance_matrix_function':'func:distance_matrix_euclidean',
+			'linkage':'complete',
+			'cluster_choice_criterion':'func:smallest_max_distance_euclidean',
+			
+			'var_index':0,
+			},
 	}, #end of 'clusters'
-
 
 	'classification':{
 		'var_index':0,
 		'scaler_func':'func:standard_scaler',  #can be None
-		'class_func':'func:random_forest_classifier', #args are (X,Y) where X is features and Y labels
-												 #returns the classification object
-		'n_points':.8, #1 means all, <1 means fraction (float), >1 is number of points (integer)
-		'n_neighbors':10,
-		'n_estimators':50,
-		'max_depth':13,
-		'min_samples_split':2,
+		# 'scaler_func':None,
+
+		## RANDOM FOREST -- 0.81 / 1.00
+		'class_func':'func:random_forest_classifier', 
+		'n_estimators':100, # 100-200
+		'max_depth':20, # 20
+		'min_samples_split':2, # 2 
+		'criterion':'entropy', # dm
+		'min_impurity_decrease':0, # 0
+		'ccp_alpha':0, # 0 
+
+
+		## EXTREME FOREST -- 0.81 / 1.00
+		# 'class_func':'func:extreme_forest_classifier', 
+		# 'n_estimators':100, # 100-200
+		# 'max_depth':20, # 20
+		# 'min_samples_split':2, # 2 
+		# 'criterion':'entropy', # dm
+
+		## SVM -- 0.59 / 0.60
+		# 'class_func':'func:svm_svc_classifer',
+		# 'reg':0.01,
+
+		## Gaussian Process Clf -- 0.71 / 0.85 (also takes years)
+		# 'class_func':'func:gaussian_process_classifier', 
+
+		# NN Clf -- 0.83 / 0.99 (relu, adam, constant)
+		# 'class_func':'func:neural_network_classifier',
+		# 'hidden_layers':(250, 250),
+		# 'alpha':.01,
+		# 'learning_rate':'constant',
+		# 'solver':'adam',
+		# 'activation':'relu',
+
+		## AdaBoost Clf -- 0.61 / 0.61
+		# 'class_func':'func:AdaBoost_classifier',
+		# 'n_estimators':200,
+		# 'learning_rate':1,
+
+		'n_points':.7, 
 		'perform_test':True,
 		'test_func':'func:dotscore_classifier_test',
 	},
-
 
 	'storage':{
 		'storage_dir':'saves',
@@ -71,14 +102,13 @@ parameters={
 		'save_original_call':True,
 		'dir_name':'func:get_dataset_basename',
 		'dir_name_args':['func:spl_return_self'],
-
 	},
 
 	'sub_datasets':{
 		'n_subdata':'func:get_splitter_n_clusters',  #args are just the splitter
 		'indices_func':'func:get_splitter_cluster_indices_i', #function to be called every step of the loop
-						   					#returns indices of the initial dataset to be used as a subset
-						   					#args are (db,i,*args) where 'i' is the iteration variable
+											#returns indices of the initial dataset to be used as a subset
+											#args are (db,i,*args) where 'i' is the iteration variable
 		'save_func':'func:save_subdata_sgdml_i',
 	},
 
@@ -106,7 +136,6 @@ parameters={
 			'solver':'analytic',
 			'use_cprsn':False,
 		},
-
 	},
 
 
@@ -243,10 +272,7 @@ parameters={
 			'graph_paras':{
 			},
 		},		
-
 	},
-
-
 
 	'error_graph_default':{
 		'matplotlib_style':'seaborn',
@@ -327,7 +353,9 @@ parameters={
 	},
 
 	'R_to_xyz':{
-		'var_index':1,
+		'var_index_R':1,
+		'var_index_F':2,
+		'var_index_E':3,
 		# needs to be in the form of R_concat 
 		# (so shape = (n_samples, n_dim*n_atoms))
 
@@ -339,18 +367,20 @@ parameters={
 		# used for split
 		'data_train_func':'func:sgdml_train_data',
 		'data_train_func_args':['para:train_models,sgdml_train_args'],
-		'original_indices':True, # NYI
+		'original_indices':False, # NYI
 
 		'classify':True,
 
 		'mix_model':True,
-		'preload_predict':True,
+		'preload_predict':False,
 		'preload_predict_func':'func:sgdml_path_predict_F',
 		'preload_batch_size':500,
 		'preload_input_var':1,
 	},
 
 	'split_inter':{
+		'branching_mode':'naive',
+
 		'local_error_comp_index':2,
 		'local_error_input_index':1,
 		'local_predict_func':'func:sgdml_path_predict_F',
@@ -358,8 +388,13 @@ parameters={
 		'local_error_func':'func:root_mean_squared_error',
 
 		'accept_min_size':None,
+		'split_min_size':None,
+		'keep_below_error':0.3,
+		'checkpoints':True,
+		'split_incentiviser_factor':1,
+		'max_n_models':13,
 
-		'score_function':'func:weighted_error_branch_score', 
+		'score_function':'func:weighted_error_branch_score',
 		# lower score is better
 		# 
 	},

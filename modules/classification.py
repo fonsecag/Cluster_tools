@@ -48,7 +48,7 @@ class ClassificationHandler(ClusterHandler):
 			print_ongoing_process("Preparing scaler",True)
 		else:
 			self.scaler = None
-			print_warn("No scaler chosen for classification.")
+			print_warning("No scaler chosen for classification.")
 
 
 		N,X_sub,Y_sub,X_rest,Y_rest = len(Y),None,None,None,None
@@ -115,10 +115,10 @@ class ClassificationHandler(ClusterHandler):
 		import joblib
 
 		path=self.storage_dir
-		print_ongoing_process('Saving classifer x scaler')
 		if getattr(self,'classification_x_scaler',None) is not None:
+			print_ongoing_process('Saving classifer x scaler')
 			joblib.dump(self.classification_x_scaler,os.path.join(path,"clf_x_scaler.z"))
-		print_ongoing_process(f'Saved classifer x scaler {os.path.join(path,"clf_x_scaler.z")}',True)
+			print_ongoing_process(f'Saved classifer x scaler {os.path.join(path,"clf_x_scaler.z")}',True)
 
 		print_ongoing_process('Saving classifer')
 		if getattr(self,'classifier',None) is not None:

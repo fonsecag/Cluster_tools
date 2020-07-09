@@ -94,7 +94,7 @@ def prepare_classifier(self):
 		print_ongoing_process("Preparing scaler",True)
 	else:
 		self.scaler=None
-		print_warn("No scaler chosen for classification.")
+		print_warning("No scaler chosen for classification.")
 
 
 	N,X_sub,Y_sub,X_rest,Y_rest=len(Y),None,None,None,None

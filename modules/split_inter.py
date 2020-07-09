@@ -10,17 +10,17 @@ class SplitInterHandler(SplitModelHandler):
 	def __init__(self,args, **kwargs):
 		super().__init__(args, **kwargs)
 		self.n_stages += 1
+		self.model_ext = self.call_para('train_models','model_ext')
 
 	def run_command(self):
 
 		self.model_dir = os.path.join(self.storage_dir, 'models')
-		self.model_ext = self.call_para('train_models','model_ext')
 		os.mkdir(self.model_dir)
 
 		ClusterHandler.run_command(self)
 		self.cluster_dict = [ 
-			{'ind':np.copy(x), 'rejected':False, 'err':None, 'model':None} 
-			for x in self.cluster_indices]
+			{'ind':np.copy(x), 'rejected':False, 'err':None, 'depth':0, \
+			'model':None} for x in self.cluster_indices]
 
 
 		## INITIAL MODEL
@@ -44,28 +44,70 @@ class SplitInterHandler(SplitModelHandler):
 
 		self.compute_local_errors()
 		self.print_branch_summary()
+		self.save_checkpoint()
+		self.branching()
+		self.classify()
+		self.preload_predict()
 
+	def branching(self):
 		## BRANCHING
 		self.print_stage('Branching')
-		iters = 0
-		while self.attempt_branching():
+		max_n_models = self.call_para('split_inter', 'max_n_models')
+		if max_n_models is None:
+			max_n_models = np.inf
+
+		iters, keep_going = 0, True
+		while keep_going:
 			iters += 1
 			if iters > 100:
 				print_warning('More than 100 branching iterations, broke out')
 				break
 
+			n_models = len(self.cluster_dict)
+			if n_models >= max_n_models:
+				print_info(f'Reached {n_models} models, for threshold of'\
+					f' {max_n_models}, stopped splitting.')
+				break
+
+			keep_going = self.attempt_branching()
+
+		# save cluster_indices
+		cd = self.cluster_dict
+		self.cluster_indices = [ x['ind'] for x in cd]
+
 		# put models back out of temp
 		self.clear_cluster_dict_temp()
+
+	def classify(self):
 
 		if self.call_para('split_models', 'classify'):
 			self.print_stage('Classification')
 			ClassificationHandler.prepare_classifier(self)
 
+	def preload_predict(self):
+
 		if self.call_para('split_models', 'preload_predict'):
 			self.print_stage('Pre-predicting models')
 			self.preload_model_predictions()
 
+	def resume_command(self):
+
+		self.model_dir = os.path.join(self.storage_dir, 'models')
+		if not os.path.exists(self.model_dir):
+			os.mkdir(self.model_dir)
+
+		self.print_stage('Loading checkpoint')
+		self.cluster_dict = self.resume_info['cluster_dict']
+		self.unique_id = self.resume_info['unique_id']
+		print_ongoing_process('Checkpoint successfully loaded', True)
+		self.print_branch_summary()
+
+		self.branching()
+		self.classify()
+		self.preload_predict()
+
 	def clear_cluster_dict_temp(self):
+
 		self.submodels = []
 		for i in range(len(self.cluster_dict)):
 			branch = self.cluster_dict[i]
@@ -76,12 +118,12 @@ class SplitInterHandler(SplitModelHandler):
 
 	def print_branch_summary(self):
 		print_subtitle('-------------- Current branch summary --------------')
-		print(f"{'N':<3}{'size':<8}{'err':<8}{'rej':<5}{'temp_file'}")
+		print(f"{'N':<3}{'size':<8}{'err':<8}{'rej':<5}{'dep':<5}{'temp_file'}")
 
 		for i in range(len(self.cluster_dict)):
 			b = self.cluster_dict[i]
 			print(f"{i:<3}{len(b['ind']):<8}{b['err']:<8.2f}{b['rejected']:<5}"
-				f"{b['model']}")
+				f"{b['depth']:<5}{b['model']}")
 		print('----------------------------------------------------')
 
 	unique_id = 0
@@ -136,13 +178,25 @@ class SplitInterHandler(SplitModelHandler):
 			success = self.reject_accept_branch(index, branches, False)
 
 		self.print_branch_summary()
+		cd = self.cluster_dict
+		self.cluster_indices = [x['ind'] for x in cd]
+		self.save_checkpoint()
 
 		return True
 
 	def find_splittable_branch(self):
-		for i in range(len(self.cluster_dict)):
+		mode = self.call_para('split_inter', 'branching_mode')
+		indices = np.arange(len(self.cluster_dict))
+		if mode == 'tot_err':
+			cd = self.cluster_dict
+			tot_errs = [cd[i]['err']*len(cd[i]['ind']) for i in range(len(cd))]
+			argsort = np.flip(np.argsort(tot_errs))
+			indices = indices[argsort]
+
+		for i in indices:
 			if not self.cluster_dict[i]['rejected']:
 				return i
+
 		return None
 
 	def split_branch(self, index):
@@ -150,24 +204,39 @@ class SplitInterHandler(SplitModelHandler):
 		from funcs.cluster import cluster_do
 		scheme=self.call_para('fine_clustering','clustering_scheme')
 
+		keep = self.call_para('split_inter', 'keep_below_error')
+		err = self.cluster_dict[index]['err']
+		if (err is not None) and (err <= keep):
+			print_info(f'Error {err:.2f} below keep minimum {keep}')
+			return [], False
+
+		keep = self.call_para('split_inter', 'keep_below_size')
+		size = len(self.cluster_dict[index]['ind'])		
+		if (size is not None) and (size <= keep):
+			print_info(f'Size {size} below keep minimum {keep}')
+			return [], False
+
 		cl_ind = self.cluster_dict[index]['ind']
 		cl_ind_new = cluster_do(self, scheme, cl_ind)
 		self.print_cluster_summary(cl_ind_new)
 
-		branch = [{'ind':x, 'rejected':False, 'err':None, 'model':None}
-			for x in cl_ind_new]
+		depth = self.cluster_dict[index]['depth'] + 1
+		branch = [{'ind':x, 'rejected':False, 'err':None, 'depth':depth, \
+			'model':None} for x in cl_ind_new]
 
 		# check valid min size
 		min_size = self.call_para('split_inter', 'accept_min_size')
 		if min_size is not None:
 			for x in branch:
-				if len(x['ind'])<min_size:
+				l = len(x['ind'])
+				if l < min_size:
 					valid = False
-					print('Min size reached, rejected!')
+					print_info(f'Size {l} below minimum split size'\
+						f' {min_size}, rejected.')
 					break
 
 		return branch, valid
-		
+	
 	def train_branch(self, branches):
 
 		for i in range(len(branches)):
@@ -191,7 +260,10 @@ class SplitInterHandler(SplitModelHandler):
 			old_score = self.call_para('split_inter', 'score_function',
 				args = [self, [self.cluster_dict[index]]])
 
-		if (not valid) or (old_score < new_score): # lower score is better
+		factor = self.call_para('split_inter', 'split_incentiviser_factor')
+
+		# lower score is better
+		if (not valid) or (old_score < new_score*factor): 
 			self.cluster_dict[index]['rejected'] = True
 			print_ongoing_process('Rejected branch splitting', True)
 			return False 
@@ -229,3 +301,19 @@ class SplitInterHandler(SplitModelHandler):
 
 		if self.call_para('split_models', 'classify'):
 			ClassificationHandler.save_classifier(self)
+
+	def save_checkpoint(self):
+		if not self.call_para('split_inter', 'checkpoints'):
+			return
+
+		path = os.path.join(self.storage_dir, 'checkpoint.p')
+		print_ongoing_process(f'Saving checkpoint {path}')
+		d = {
+			'unique_id':self.unique_id,
+			'cluster_dict':self.cluster_dict,
+		}
+
+		with open(path, 'wb') as file:
+			pickle.dump(d, file)
+
+		print_ongoing_process(f'Saving checkpoint {path}', True)

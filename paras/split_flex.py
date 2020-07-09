@@ -29,14 +29,14 @@ parameters={
 		'model_info_func':'func:sgdml_model_info',
 
 		'sgdml_train_args':{
-			'n_train':50, # will be handled automatically where needed
+			'n_train':30, # will be handled automatically where needed
 						   # for example for improved learning
 			'n_test':1,
 			'n_valid':20,
 			'overwrite':True,
 			'command':'all',
 			'sigs':None,
-			'gdml':False,
+			'gdml':True,
 			'use_E':False,
 			'use_E_cstr':False,
 			# 'max_processes':-1, # set manually in the function
@@ -48,11 +48,20 @@ parameters={
 	},
 
 	'split_models':{
-		'mix_model':False,
+		'data_train_func':'func:sgdml_train_data_flex',
+		'mix_model':True,
+		'preload_predict':True,
 	},
 
 	'split_inter':{
-		'accept_min_size':20,
+		'branching_mode':'tot_err',
+
+		'accept_min_size':3,
+		'keep_below_size':0,
+		'keep_below_error':.3,
+		'split_incentiviser_factor':.95,
+
+		'max_n_models':5,
 	},
 
 }

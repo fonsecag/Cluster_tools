@@ -7,7 +7,28 @@ from functools import partial
 import multiprocessing as mp 
 
 
-def smallest_max_distance_euclidean(sample,clusters):
+def cl_ind_to_label(cl_ind):
+	n_clusters = len(cl_ind)
+	n_tot = len(np.concatenate(cl_ind))
+
+	a = np.zeros(n_tot)
+
+	for i in range(n_clusters):
+		cl = cl_ind[i]
+		a[cl] = i
+
+	return a.astype('int')
+
+def label_to_cl_ind(labels):
+	n_max = int(np.max(labels)) + 1
+	c_ind = []
+	for j in range(n_max):
+		indices = np.argwhere(labels == j).ravel()
+		c_ind.append(indices)
+
+	return c_ind
+
+def smallest_max_distance_euclidean(sample):
 	'''
 	Finds the cluster that the given sample belongs to. Simple euclidean distance is used.
 	(The metric used should be the same as for the agglomerative clustering.)
@@ -26,9 +47,17 @@ def smallest_max_distance_euclidean(sample,clusters):
 										 
 	'''
 
+	global g_cluster_data, g_cluster_data_shape
+	n_clusters = len(g_cluster_data_shape)
+
+	clusters = [
+		np.frombuffer(g_cluster_data[i]).reshape(g_cluster_data_shape[i])
+		for i in range(n_clusters)]
+
 	g=np.zeros(len(clusters))
 	for i in range(len(clusters)):
 		g[i]=np.max(np.sum(np.square(clusters[i]-sample),1))   #numpy difference=>clusters[c]-sample elementwise for each c
+		
 	return np.argmin(g)
 	
 def distance_matrix_euclidean(data):
@@ -105,18 +134,49 @@ def agglomerative_clustering(self,indices,scheme_index):
 	#outs=np.trunc(np.linspace(0,len(data_rest),99))
 
 	l_data_rest=len(data_rest)
+	global g_cluster_data
+	global g_cluster_data_shape
+	g_cluster_data_shape = [x.shape for x in cluster_data]
+	g_cluster_data = [mp.RawArray('d', cluster_data[i].ravel()) 
+		for i in range(len(cluster_data))]
 
-	if l_data_rest>0:
-		for i in range(l_data_rest):
-			c=self.call_para('clusters',scheme_index,"cluster_choice_criterion",
-				args=[data_rest[i],cluster_data],
-			)
-			cluster_ind[c].append(ind_rest[i])
+	# global n_done, n_tot
+	# n_done = 0, n_tot = l_data_rest
+
+	# print_ongoing_process("Sorting rest of data")
+
+
+	if l_data_rest > 0:
+
+		f = self.get_para('clusters', scheme_index, 'cluster_choice_criterion')
+
+		pool = mp.Pool(processes = self.n_cores)
+
+		for i,x in enumerate(pool.imap(f, data_rest, 100)):
+			cluster_ind[x].append(ind_rest[i])
 			print_percent("Sorting rest of data",i,l_data_rest)
 
 		print_percent("Sorting rest of data",l_data_rest,l_data_rest,True)
 
+		# clean up
+		pool.close()
+		g_cluster_data = None
+		g_cluster_data_shape = None 
 
+	# if l_data_rest>0:
+	# 	for i in range(l_data_rest):
+	# 		c=self.call_para('clusters',scheme_index,"c=luster_choice_criterion",
+	# 			args=[data_rest[i],cluster_data],
+	# 		)
+	# 		cluster_ind[c].append(ind_rest[i])
+	# 		print_percent("Sorting rest of data",i,l_data_rest)
+
+	# 	print_percent("Sorting rest of data",l_data_rest,l_data_rest,True)
+
+
+	# for i in range(l_data_rest):
+	# 	cluster_ind[labels[i]].append(ind_rest[i])
+	# print_ongoing_process("Sorting rest of data", True)
 
 	if indices is None:
 		return cluster_ind

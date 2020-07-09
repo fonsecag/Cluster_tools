@@ -32,6 +32,28 @@ def toDistance(R):
     y=np.array(y)
     return y
 
+def to_distance_minkowski_p(R, n):
+
+    shape=R.shape
+    try:
+        dim=shape[2]
+    except:
+        return
+    if shape[1]<2:
+        return
+
+    y=[]
+
+    for i in range(len(R)): ##goes through samples
+        y.append(pdist(R[i], metric = 'minkowski', p = n))
+
+    y=np.array(y)
+    return y
+
+def r_to_minkowski_m0p5(dataset):
+    R = dataset['R']
+    return to_distance_minkowski_p(R, -0.5)
+
 def r_to_inv_dist(dataset):
     R=dataset['R']
     return 1. / toDistance(R)
@@ -39,6 +61,10 @@ def r_to_inv_dist(dataset):
 def r_to_dist(dataset):
     R=dataset['R']
     return toDistance(R)
+
+def f_to_dist(dataset):
+    F = dataset['F']
+    return toDistance(F)
 
 def extract_E(dataset):
     E=dataset['E']
@@ -49,7 +75,7 @@ def extract_E_neg(dataset):
     return -np.array(E).reshape(-1,1)
 
 def extract_R_concat(dataset):
-
+    
     R=dataset['R']
     n_samples,n_atoms,n_dim=R.shape
     R=np.reshape(R,(n_samples,n_atoms*n_dim))

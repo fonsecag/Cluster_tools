@@ -112,6 +112,17 @@ def parse_arguments(args):
             default='default',
             )
 
+    # ADD ARGUMENTS FOR RESUME
+    resume_boys = [p_split_inter]
+    for x in resume_boys:
+        x.add_argument(
+            '-r',
+            '--resume',
+            metavar = '<resume_dir>',
+            dest='resume_dir',
+            help='path to save file from which to resume',
+            required=False,
+            )
 
     # ADD SPECIFIC ARGUMENTS FOR SUBS
     for x in [p_train]:
@@ -175,6 +186,15 @@ def parse_arguments(args):
     else:
         print_error(f"No valid para file found under name: {args['para_file']}")
 
+    resume_dir = args.get('resume_dir', False)
+    if resume_dir:
+        args['resume'] = True
+        if not os.path.exists(resume_dir):
+            print_error(
+                f"Tried to resume from path {resume_dir}, but doesn't exist")
+    else:
+        args['resume'] = False
+
     # add full call
     args['full_call']=full_call
 
@@ -186,24 +206,8 @@ class MainHandler():
     def __init__(self,args, needs_dataset = True):
 
         self.args=args
-        #load para filer_to_dist
-        para_file=args['para_file']
-        para_mod=__import__(para_file)
-        para=para_mod.parameters
-        funcs=func_dict_from_module(para_mod)
-
-        # merge with defaults 
-        para_def_mod=__import__("default")
-        para_def=para_def_mod.parameters
-
-        # extracts any function from the para.py file
-        funcs_def=func_dict_from_module(para_def_mod)
-
-        merge_para_dicts(para_def,para) #WAI
-
-        self.para=para_def
-        z={**funcs_def,**funcs} #WAI
-        self.funcs=z
+        self.resumed = args['resume']
+        self.load_paras("default", args['para_file'])
 
         n_cores = int(self.call_para('n_cores') or 1)
         if n_cores==0:
@@ -213,12 +217,32 @@ class MainHandler():
         self.n_cores = n_cores
 
         # merge exceptions
-        if para.get('load_dataset',{}).get('var_funcs',None) is not None:
-            self.para['load_dataset']['var_funcs']=para['load_dataset']['var_funcs']
+        if self.para.get('load_dataset',{}).get('var_funcs',None) is not None:
+            self.para['load_dataset']['var_funcs'] = self.para['load_dataset']['var_funcs']
 
         if not needs_dataset:
             self.n_main_stages -= 2 
             self.needs_dataset = False
+
+    def load_paras(self, default, para_file):
+
+        args = self.args
+        para_mod = __import__(para_file)
+        para = para_mod.parameters
+        funcs = func_dict_from_module(para_mod)
+
+        # merge with defaults 
+        para_def_mod = __import__(default)
+        para_def = para_def_mod.parameters
+
+        # extracts any function from the para.py file
+        funcs_def = func_dict_from_module(para_def_mod)
+
+        merge_para_dicts(para_def,para) #WAI
+
+        self.para = para_def
+        z = {**funcs_def,**funcs} #WAI
+        self.funcs = z
 
 
     needs_dataset = True
@@ -340,9 +364,13 @@ class MainHandler():
             self.prepare_vars()
 
         self.print_stage('Prepare storage')
-        self.prepare_storage()
+        if self.args['resume']:
+            self.resume_storage()
+            self.resume_command()
 
-        self.run_command()
+        else:
+            self.prepare_storage()
+            self.run_command()
 
         self.print_stage('Save in storage')
         self.save_main()
@@ -421,6 +449,45 @@ class MainHandler():
 
     def do_nothing(*args):
         print_debug("Doing nothing. Please be patient.")
+
+    def resume_storage(self):
+        args = self.args
+        path = args['resume_dir']
+        self.storage_dir = path
+        self.temp_dir = os.path.join(path, 'temp')
+
+        if os.path.exists(path):
+            print_ongoing_process(f"Save path {path} found.", True)
+
+        cp_path = os.path.join(path, 'checkpoint.p')
+        if not os.path.exists(cp_path):
+            print_error(f"No checkpoint file found at {cp_path}")
+
+        with open(cp_path, 'rb') as file:
+            info = pickle.loads(file.read())
+
+        self.resume_info = info 
+
+        if self.call_para('storage','save_original_call'):
+            print_ongoing_process('Saving call')
+            with open(os.path.join(path,"Call.txt"),'a+') as file:
+                print(f"Resume call: {args.get('full_call','N/A')}",file=file)
+                print_ongoing_process(f'Saved resume call in {os.path.join(path,"Call.txt")}',True)
+        
+        # NOT YET SUPPORTED
+        # print_ongoing_process("Searching for parameter files")
+        # def_para = "default"
+        # add_para = args['para_file']
+        # for file in glob.glob(os.path.join(path,'*.py')):
+        #     print(file)
+        #     if file.startswith("default"):
+        #         def_para = file
+        #     else:
+        #         add_para = file
+
+        # self.load_paras(def_para, add_para)
+        # print_ongoing_process("Searching for parameter files", True)
+
 
     def prepare_storage(self):
 
@@ -507,7 +574,7 @@ if __name__=='__main__':
     if command == 'cluster':
         from modules.cluster import ClusterHandler 
         hand = ClusterHandler(args)
-        
+
     elif command == 'class':
         from modules.classification import ClassificationHandler
         hand = ClassificationHandler(args)

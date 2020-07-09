@@ -89,6 +89,10 @@ def sgdml_all_default(train_indices, args):
 	)
 	print('         This is your model file: \'{}\''.format(model_file_name))
 
+	if "glob" in globals():
+		global glob
+		del glob
+
 def sgdml_predict_F(self, R):
 	model = self.curr_model 
 	_, F = model.predict(R)
@@ -105,8 +109,8 @@ def sgdml_model_info(self):
 	print(f"{'n_atoms':<10}{dic['n_atoms']}")
 	print(f"{'n_train':<10}{dic['n_train']}")
 
-def sgdml_train_default(self, train_indices, model_path, 
-		old_model_path, sgdml_args):
+def sgdml_train_default(
+	self, train_indices, model_path, old_model_path, sgdml_args):
 
 
 	args=sgdml_args.copy()
@@ -146,9 +150,7 @@ def sgdml_train_default(self, train_indices, model_path,
 	# else:
 	# 	cli.all(**args)
 
-
 def sgdml_train_data(self, dataset_tuple, model_path, sgdml_args):
-
 
 	args=sgdml_args.copy()
 
@@ -163,12 +165,35 @@ def sgdml_train_data(self, dataset_tuple, model_path, sgdml_args):
 	args['max_processes'] = self.n_cores
 	args['model0'] = None
 
+	print_ongoing_process(f"Training model ({args['n_train']} points)")
+
+	start_time = time.time()
 	if self.call_para('train_models','suppress_sgdml_prints'):
 		with sgdml_print_suppressor():
 			sgdml_all_default(None, args)
 
 	else:
 		sgdml_all_default(None, args)
+
+	print_ongoing_process(f"Trained model ({args['n_train']} points)", True,
+		time = time.time() - start_time)
+
+def sgdml_train_data_flex(self, dataset_tuple, model_path, sgdml_args):
+	args = sgdml_args.copy()
+
+	n_train, n_valid, n_test = \
+		args['n_train'], args['n_valid'], args['n_test']
+
+	tot = n_train + n_valid + n_test
+	N = len(dataset_tuple[1]['R'])
+
+	if N < n_train:
+		args['n_train'], args['n_valid'], args['n_test'] = N -2, 1, 1
+	elif N < tot:
+		n_train = min(n_train, N - 2)
+		args['n_train'], args['n_valid'], args['n_test'] = n_train, 1, 1
+
+	sgdml_train_data(self, dataset_tuple, model_path, args)
 
 def sgdml_path_predict_F(self, model_path, input_var, batch_size):
 	from sgdml.predict import GDMLPredict
@@ -205,45 +230,6 @@ def sgdml_path_predict_F(self, model_path, input_var, batch_size):
 
 	predicts=np.concatenate(predicts)
 	return predicts
-
-
-# def sgdml_path_predict_F_ind(self, model_path, id, input_var, ind, batch_size):
-# 	from sgdml.predict import GDMLPredict
-
-# 	N=len(ind)
-# 	n_batches=N//batch_size+1
-
-# 	if n_batches>999:
-# 		width=20
-# 	else:
-# 		width=None
-
-# 	input_var = np.array(input_var)[ind]
-
-# 	npz = np.load(model_path)
-# 	model=GDMLPredict(npz)
-
-# 	message=f'Predicting model_{id} batches'
-
-# 	predicts=[]
-
-# 	start_time,eta=time.time(),0
-# 	for i in range(n_batches):
-# 		print_x_out_of_y_eta(message,i,n_batches,eta,width=width)
-# 		R=input_var[i*batch_size:(i+1)*batch_size]
-# 		if len(R)==0:
-# 			break
-# 		_,F=model.predict(R)
-# 		predicts.append(F)
-
-# 		avg_time=(time.time()-start_time)/(i+1)
-# 		eta=(n_batches-i+1)*avg_time
-
-# 	print_x_out_of_y_eta(message,n_batches,n_batches,time.time()-start_time,True,width=width)
-
-# 	predicts=np.concatenate(predicts)
-# 	return predicts
-
 
 def get_sgdml_training_set(self, model):
 	print(model.__dict__.keys())
