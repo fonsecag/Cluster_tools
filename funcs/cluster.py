@@ -100,20 +100,27 @@ def agglomerative_clustering(self,indices,scheme_index):
 
 	print_ongoing_process("Preparing agglomerative clustering",True)
 
-	print_ongoing_process("Computing distance matrix")
-	M=self.call_para('clusters',scheme_index,'distance_matrix_function',args=[data_init])
-	print_ongoing_process("Computing distance matrix",True)
+	if self.call_para('clusters', scheme_index, 'custom'):
+		print_ongoing_process("Computing distance matrix")
+		M=self.call_para('clusters',scheme_index,'distance_matrix_function',args=[data_init])
+		print_ongoing_process("Computing distance matrix",True)
 
-	##agglo
-	print_ongoing_process("Computing tree")
-	linkage=self.call_para('clusters',scheme_index,'linkage')
+		##agglo
+		print_ongoing_process("Computing tree")
+		linkage=self.call_para('clusters',scheme_index,'linkage')
 
-	cinit_labels=AgglomerativeClustering(
-		affinity="precomputed",n_clusters=n_clusters,
-		linkage=linkage,
-	).fit_predict(M)
+		cinit_labels=AgglomerativeClustering(
+			affinity="precomputed",n_clusters=n_clusters,
+			linkage=linkage,
+		).fit_predict(M)
 
-	print_ongoing_process("Compute tree",True)
+	else:
+		print_ongoing_process("Computing tree")
+		cinit_labels = AgglomerativeClustering(
+			n_clusters = n_clusters
+		).fit_predict(data_init)
+
+	print_ongoing_process("Computed tree",True)
 
 	cluster_ind=[]
 	for i in range(n_clusters):
