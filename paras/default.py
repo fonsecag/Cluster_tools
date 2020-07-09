@@ -249,29 +249,29 @@ parameters={
 			},
 		},
 
-		# RMSE atom-wise
-		6:{
-			'predicts_index':0,
-			'comparison_var_index':2,			
+		# # RMSE atom-wise
+		# 6:{
+		# 	'predicts_index':0,
+		# 	'comparison_var_index':2,			
 
-			'error_func':'func:root_mean_squared_error_atom_wise',
-			'save_key':'RMSE_atomwise', #will be saved in save.p under the given key (in 'errors' sub dict)
-			'graph':False,
-			'graph_paras':{
-			},
-		},		
+		# 	'error_func':'func:root_mean_squared_error_atom_wise',
+		# 	'save_key':'RMSE_atomwise', #will be saved in save.p under the given key (in 'errors' sub dict)
+		# 	'graph':False,
+		# 	'graph_paras':{
+		# 	},
+		# },		
 
-		# RMSE atom-wise-bins
-		7:{
-			'predicts_index':0,
-			'comparison_var_index':2,			
+		# # RMSE atom-wise-bins
+		# 7:{
+		# 	'predicts_index':0,
+		# 	'comparison_var_index':2,			
 
-			'error_func':'func:root_mean_squared_error_atom_wise_bins',
-			'save_key':'RMSE_atomwise_bins', #will be saved in save.p under the given key (in 'errors' sub dict)
-			'graph':False,
-			'graph_paras':{
-			},
-		},		
+		# 	'error_func':'func:root_mean_squared_error_atom_wise_bins',
+		# 	'save_key':'RMSE_atomwise_bins', #will be saved in save.p under the given key (in 'errors' sub dict)
+		# 	'graph':False,
+		# 	'graph_paras':{
+		# 	},
+		# },		
 	},
 
 	'error_graph_default':{

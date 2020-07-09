@@ -247,7 +247,7 @@ def cluster_do(self,scheme, init_ind = None):
 
 		cl_ind=cl_ind_new
 
-	return cl_ind
+	return np.array(cl_ind, dtype = 'object')
 
 def worst_N_clusters(self,N,*args):
 	mse=self.cluster_err

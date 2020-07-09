@@ -316,7 +316,7 @@ class ClusterErrorHandler(ClusterHandler):
 				ind_sorted = np.arange(len(err))
 
 			err = np.array(err)[ind_sorted]
-			cl_ind = np.array(cluster_indices)[ind_sorted]
+			cl_ind = np.array(cluster_indices, dtype = 'object')[ind_sorted]
 
 			# HELPING VARS
 			n_clusters = len(cl_ind)
