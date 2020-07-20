@@ -42,7 +42,7 @@ def parse_arguments(args):
 
     p_split_train = subp.add_parser(
         'split_train',
-        help='Train a split model',
+        help='Train a split model. EXPERIMENTAL.',
     )
 
     p_split_inter = subp.add_parser(
@@ -413,11 +413,22 @@ class MainHandler():
 
             print_ongoing_process(f"Loaded npz file {path}",True)
 
+        # schnetpack .db
+        elif ext == '.db':
+            print_ongoing_process(f"Loading db file {path}")
+
+            from schnetpack import AtomsData
+            data = AtomsData(path)
+
+            print_ongoing_process(f"Loaded db file {path}", True)
+
+
         else:
-            print_error(f"Unsupported data type {ext} for given dataset {path} (xyz and npz supported).")
+            print_error(f"Unsupported data type {ext} for given dataset {path} (xyz, npz, schnetpack .db supported).")
 
         
         self.dataset=data
+        self.dataset_path = path
         if self.get_para('load_dataset','post_processing') is not None:
             print_ongoing_process('Post-processing dataset')
             self.call_para('load_dataset','post_processing',args=[self])
@@ -435,7 +446,7 @@ class MainHandler():
         for i in range(len(keys)):
             print_x_out_of_y("Extracting vars",i,len(keys))
             x=keys[i]
-            self.vars.append(self.call_para("load_dataset","var_funcs",x,args=[self.dataset]))
+            self.vars.append(self.call_para("load_dataset","var_funcs",x,args=[self, self.dataset]))
         print_x_out_of_y("Extracting vars",len(keys),len(keys),True)
 
         # SUMMARY

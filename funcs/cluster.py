@@ -195,6 +195,21 @@ def agglomerative_clustering(self,indices,scheme_index):
 
 	return cluster_ind
 
+
+def single_cluster(self, indices, scheme_index):
+
+	if indices is not None:
+		return [indices]
+
+	else:
+		##generate data
+		var_index=self.call_para('clusters',scheme_index,'var_index')
+		data=self.vars[var_index]
+
+		return [np.arange(len(data))]
+
+
+
 def kmeans_clustering(data_base,indices,clustering_index):
 	print_ongoing_process("Preparing KMeans")
 	para=data_base.para['clusters'][clustering_index]

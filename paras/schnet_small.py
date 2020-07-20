@@ -7,13 +7,13 @@ parameters={
 		'post_processing':None,
 		'post_processing_args':[],
 
-		'schnet_preprocessed_npz':False,
+		'schnet_preprocessed_npz':True,
 
 		'var_funcs':{
-			0:'func:r_to_dist',
-			1:'func:extract_R_concat',
-			2:'func:extract_F_concat',
-			3:'func:extract_E',
+			0:'func:schnet_r_to_dist',
+			1:'func:schnet_extract_F_concat',
+			2:'func:schnet_extract_E',
+			3:None,
 		}, #end of 'var_funcs'
 	},
 

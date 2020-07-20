@@ -50,45 +50,136 @@ def to_distance_minkowski_p(R, n):
     y=np.array(y)
     return y
 
-def r_to_minkowski_m0p5(dataset):
+def r_to_minkowski_m0p5(self, dataset):
     R = dataset['R']
     return to_distance_minkowski_p(R, -0.5)
 
-def r_to_inv_dist(dataset):
+def r_to_inv_dist(self, dataset):
     R=dataset['R']
     return 1. / toDistance(R)
 
-def r_to_dist(dataset):
+def r_to_dist(self, dataset):
     R=dataset['R']
     return toDistance(R)
 
-def f_to_dist(dataset):
+def f_to_dist(self, dataset):
     F = dataset['F']
     return toDistance(F)
 
-def extract_E(dataset):
+def extract_E(self, dataset):
     E=dataset['E']
     return np.array(E).reshape(-1,1)
 
-def extract_E_neg(dataset):
+def extract_E_neg(self, dataset):
     E=dataset['E']
     return -np.array(E).reshape(-1,1)
 
-def extract_R_concat(dataset):
+def extract_R_concat(self, dataset):
     
     R=dataset['R']
     n_samples,n_atoms,n_dim=R.shape
     R=np.reshape(R,(n_samples,n_atoms*n_dim))
     return np.array(R)
 
-def extract_R(dataset):
+def extract_R(self, dataset):
 
     R=dataset['R']
     n_samples,n_atoms,n_dim=R.shape
     # R=np.reshape(R,(n_samples,n_atoms*n_dim))
     return np.array(R)
 
-def extract_F_concat(dataset):
+def schnet_r_to_dist(self, dataset):
+
+    if self.call_para('load_dataset', 'schnet_preprocessed_npz'):
+
+        path = self.dataset_path.replace('.db', '.npz')
+        if os.path.exists(path):
+
+            R = np.load(self.dataset_path.replace('.db', '.npz'))['R']
+            return toDistance(R)
+
+
+    d = self.dataset
+    N = len(d)
+
+    R = []
+    for i in range(N):
+        print_x_out_of_y(f'Extracting positions', i, N)
+        R.append( d[i]['_positions'].numpy())
+
+    print_x_out_of_y(f'Extracting positions', N, N, True)
+    return toDistance(np.array(R))
+
+def schnet_extract_R_concat(self, dataset):
+    d = self.dataset
+    N = len(d)
+
+    if self.call_para('load_dataset', 'schnet_preprocessed_npz'):
+
+        path = self.dataset_path.replace('.db', '.npz')
+        if os.path.exists(path):
+
+            R = np.load(self.dataset_path.replace('.db', '.npz'))['R']
+            return R.reshape((N, -1))
+
+
+    R = []
+    for i in range(N):
+        print_x_out_of_y(f'Extracting positions', i, N)
+        R.append( d[i]['_positions'].numpy())
+
+    print_x_out_of_y(f'Extracting positions', N, N, True)
+    return np.array(R).reshape((N, -1))
+
+def schnet_extract_F_concat(self, dataset):
+    d = self.dataset
+    N = len(d)
+
+    if self.call_para('load_dataset', 'schnet_preprocessed_npz'):
+
+        path = self.dataset_path.replace('.db', '.npz')
+        if os.path.exists(path):
+
+            F = np.load(self.dataset_path.replace('.db', '.npz'))['F']
+            return F.reshape((N, -1))
+
+
+
+    F = []
+    for i in range(N):
+        print_x_out_of_y(f'Extracting forces', i, N)
+        F.append( d[i]['forces'].numpy())
+        
+    print_x_out_of_y(f'Extracting forces', N, N, True)
+    return np.array(F).reshape((N, -1))
+
+def schnet_extract_E(self, dataset):
+
+    if self.call_para('load_dataset', 'schnet_preprocessed_npz'):
+
+        path = self.dataset_path.replace('.db', '.npz')
+        if os.path.exists(path):
+
+            E = np.load(self.dataset_path.replace('.db', '.npz'))['E']
+            return E
+
+
+    d = self.dataset
+    N = len(d)
+
+    E = []
+    for i in range(N):
+        print_x_out_of_y(f'Extracting energies', i, N)
+        E.append( d[i]['energy'].numpy())
+
+    print_x_out_of_y(f'Extracting forces', N, N, True)
+    return np.array(E)
+
+def varfunc_dummy(self, dataset):
+
+    return np.zeros(len(dataset['R']))
+
+def extract_F_concat(self, dataset):
 
     F=dataset['F']
     n_samples,n_atoms,n_dim=F.shape

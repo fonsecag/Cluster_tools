@@ -34,10 +34,10 @@ class ClusterXYZHandler(ClusterHandler):
 		var_index_E = self.call_para('R_to_xyz', 'var_index_E')
 		E = self.vars[var_index_E]
 
-
 		cl_ind = self.cluster_indices
+
 		for i in range(len(cl_ind)):
-			cl = cl_ind[i]
+			cl = np.array(cl_ind[i], dtype = np.int64)
 			self.save_xyz_index(i, R[cl], F[cl], E[cl])
 
 	# def save_cluster_xyz(self):
