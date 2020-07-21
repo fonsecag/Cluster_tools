@@ -235,6 +235,269 @@ def get_sgdml_training_set(self, model):
 	print(model.__dict__.keys())
 	sys.exit()
 
+### SchNet ###
+
+def schnet_train_default(
+	self, train_indices, model_path, old_model_path, schnet_args):
+
+	import schnetpack as spk
+	import schnetpack.train as trn
+	import torch
+
+	n_val = schnet_args.get('n_val', 100)
+
+	# LOADING train, val, test
+	if type(train_indices) == int:
+		n_train = train_indices
+
+		# Preparing storage
+		storage = os.path.join(self.temp_dir, f'schnet_{n_train}')
+		if not os.path.exists(storage):
+			os.mkdir(storage)
+		split_path = os.path.join(storage, 'split.npz')
+
+		train, val, test = spk.train_test_split(
+			data = self.dataset,
+			num_train = n_train,
+			num_val = n_val,
+			split_file = split_path
+		)
+
+	else:
+		n_train = len(train_indices)
+
+		# Preparing storage
+		storage = os.path.join(self.temp_dir, f'schnet_{n_train}')
+		if not os.path.exists(storage):
+			os.mkdir(storage)
+		split_path = os.path.join(storage, 'split.npz')
+
+
+		all_ind = np.arange(len(self.dataset))
+
+		# train
+		train_ind = train_indices
+		all_ind = np.delete(all_ind, train_ind)
+
+		# val
+		val_ind = np.random.choice(
+			all_ind, n_val, replace = False)
+		all_ind = np.delete(all_ind, val_ind)
+
+		split_dict = {
+			'train_idx': train_ind,
+			'val_idx': val_ind,
+			'test_idx': all_ind,
+		}
+		np.savez_compressed(split_path, **split_dict)
+
+		train, val, test = spk.train_test_split(
+			data = self.dataset,
+			split_file = split_path
+		)
+
+	print_ongoing_process(
+		f"Preparing SchNet training, {len(train)} points", True)
+
+	data = self.dataset
+
+	batch_size     = schnet_args.get('batch_size', 10)
+	n_features     = schnet_args.get('n_features', 64)
+	n_gaussians    = schnet_args.get('n_gaussians', 25)
+	n_interactions = schnet_args.get('n_interactions', 6)
+	cutoff         = schnet_args.get('cutoff', 5.)
+	learning_rate  = schnet_args.get('learning_rate', 1e-3)
+	rho_tradeoff   = schnet_args.get('rho_tradeoff', 0.1)
+	patience       = schnet_args.get('patience', 5)
+	n_epochs       = schnet_args.get('n_epochs', 100)
+
+	# PRINTING INFO
+	i = {}
+	i['batch_size'], i['n_features']      = batch_size, n_features
+	i['n_gaussians'], i['n_interactions'] = n_gaussians, n_interactions
+	i['cutoff'], i['learning_rate']       = cutoff, learning_rate
+	i['rho_tradeoff'], i['patience']      = rho_tradeoff, patience
+	i['n_epochs']                         = n_epochs
+	print_table('Parameters', None, None, i, width = 20)
+
+	train_loader = spk.AtomsLoader(
+		train, shuffle = True, batch_size = batch_size)
+	val_loader = spk.AtomsLoader(val, batch_size = batch_size)
+
+
+	# STATISTICS + PRINTS
+	means, stddevs = train_loader.get_statistics('energy', 
+		divide_by_atoms = True)
+	print_info('Mean atomization energy / atom:      {:12.4f} [kcal/mol]' \
+		.format(means['energy'][0]))
+	print_info('Std. dev. atomization energy / atom: {:12.4f} [kcal/mol]' \
+		.format(stddevs['energy'][0]))
+
+
+	# LOADING MODEL
+	print_ongoing_process('Loading representation and model')
+	schnet = spk.representation.SchNet(
+		n_atom_basis   = n_features,
+		n_filters      = n_features,
+		n_gaussians    = n_gaussians,
+		n_interactions = n_interactions,
+		cutoff         = cutoff,
+		cutoff_network = spk.nn.cutoff.CosineCutoff
+	)	
+
+	energy_model = spk.atomistic.Atomwise(
+		n_in        = n_features,
+		property    = 'energy',
+		mean        = means['energy'],
+		stddev      = stddevs['energy'],
+		derivative  = 'forces',
+		negative_dr = True
+	)
+
+
+	model = spk.AtomisticModel(
+		representation = schnet, output_modules = energy_model)
+	print_ongoing_process('Loading representation and model', True)
+
+
+	# OPTIMIZER AND LOSS
+	print_ongoing_process('Defining loss function and optimizer')
+	from torch.optim import Adam 
+	optimizer = Adam(model.parameters(), lr = learning_rate)
+
+	def loss(batch, result):
+
+		# compute the mean squared error on the energies
+		diff_energy = batch['energy']-result['energy']
+		err_sq_energy = torch.mean(diff_energy ** 2)
+
+		# compute the mean squared error on the forces
+		diff_forces = batch['forces']-result['forces']
+		err_sq_forces = torch.mean(diff_forces ** 2)
+
+		# build the combined loss function
+		err_sq = rho_tradeoff*err_sq_energy + (1-rho_tradeoff)*err_sq_forces
+
+		return err_sq
+
+	print_ongoing_process('Defining loss function and optimizer', True)
+
+
+	# METRICS AND HOOKS
+	print_ongoing_process('Setting up metrics and hooks')
+	metrics = [
+		spk.metrics.MeanAbsoluteError('energy'),
+		spk.metrics.MeanAbsoluteError('forces')
+	]
+
+	hooks = [
+		trn.CSVHook(log_path = storage, metrics = metrics),
+		trn.ReduceLROnPlateauHook(
+			optimizer,
+			patience       = 5,
+			factor         = 0.8, 
+			min_lr         = 1e-6,
+			stop_after_min = True
+		)
+	]
+	print_ongoing_process('Setting up metrics and hooks', True)
+
+	print_ongoing_process('Setting up trainer')
+
+	trainer = trn.Trainer(
+		model_path        = storage,
+		model             = model,
+		hooks             = hooks,
+		loss_fn           = loss,
+		optimizer         = optimizer,
+		train_loader      = train_loader,
+		validation_loader = val_loader,
+	)
+
+	print_ongoing_process('Setting up trainer', True)
+
+	if torch.cuda.is_available():
+		device = "cuda"
+		print_info(f'Cuda cores found, training on GPU')
+
+	else:
+		device = "cpu"
+		print_info(f'No cuda cores found, training on CPU')
+
+
+	print_ongoing_process(f'Training {n_epochs} ecpochs, out in {storage}')
+	trainer.train(
+		device   = device,
+		n_epochs = n_epochs 
+		)
+	print_ongoing_process(f'Training {n_epochs} epochs, out in {storage}', True)
+
+	os.mkdir(model_path)
+
+	os.rename(os.path.join(storage, "best_model"),
+		os.path.join(model_path, 'model'))
+	shutil.copy(split_path, os.path.join(model_path, 'split.npz'))
+
+def load_schnet_model(self, path):
+	import torch
+	if not os.path.isdir(path):
+		print_error(f'{path} is not a directory. SchNet models need to be a '\
+			'directory containing the model as "model" and the split file as '\
+			'"split.npz"')
+
+	split, model = os.path.join(path, 'split.npz'), os.path.join(path, 'model')
+
+	if not os.path.exists(split):
+		print_error(f'"split.npz" file not found in {path}')
+
+	if not os.path.exists(model):
+		print_error(f'"model" file not found in {path}')
+
+	m = torch.load(model)
+	training_indices = np.load(split)['train_idx']
+	
+	return m, training_indices
+
+def schnet_predict_F(self, indices):
+	m = self.curr_model
+	test = self.dataset.create_subset(indices)
+
+	import schnetpack as spk 
+	test_loader = spk.AtomsLoader(test, batch_size = 100)
+	preds = []
+
+	import torch
+	if torch.cuda.is_available():
+		device = 'cuda'
+	else:
+		device = 'cpu'
+
+	for count, batch in enumerate(test_loader):
+		batch = {k: v.to(device) for k, v in batch.items()}
+		preds.append( m(batch)['forces'].detach().cpu().numpy())
+
+	F = np.concatenate(preds)
+	return F.reshape(len(F), -1)
+
+def schnet_predict_E(self, indices):
+	m = self.curr_model
+	test = self.dataset.create_subset(indices)
+
+	import schnetpack as spk 
+	test_loader = spk.AtomsLoader(test, batch_size = 100)
+	preds = []
+
+	import torch
+	if torch.cuda.is_available():
+		device = 'cuda'
+	else:
+		device = 'cpu'
+
+	for count, batch in enumerate(test_loader):
+		batch = {k: v.to(device) for k, v in batch.items()}
+		preds.append(m(batch)['energy'].detach().cpu().numpy())
+
+	return np.concatenate(preds)
 
 ### mbGDMLPredict ###
 
@@ -260,18 +523,18 @@ class solvent():
 	  # with open(solvent_json, 'r') as solvent_file:
 		 #  solvent_data=solvent_file.read()
 	  all_solvents = {
-		    "water": {
-		        "label": "H2O",
-		        "formula": "H2O"
-		    },
-		    "acetonitrile": {
-		        "label": "acn",
-		        "formula": "C2H3N"
-		    },
-		    "methanol": {
-		        "label": "MeOH",
-		        "formula": "CH3OH"
-		    }
+			"water": {
+				"label": "H2O",
+				"formula": "H2O"
+			},
+			"acetonitrile": {
+				"label": "acn",
+				"formula": "C2H3N"
+			},
+			"methanol": {
+				"label": "MeOH",
+				"formula": "CH3OH"
+			}
 		}
 	  
 	  self.identify_solvent(atom_list, all_solvents)

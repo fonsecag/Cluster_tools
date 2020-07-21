@@ -44,7 +44,6 @@ class ClusterErrorHandler(ClusterHandler):
 	def train_load_model(self, model_path, indices, old_model_path = None):
 
 		# indices is actually just the 'init' arg when first loading
-		
 		print_subtitle('Training model')
 		if self.curr_model is None:
 

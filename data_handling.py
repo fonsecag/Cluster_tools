@@ -175,6 +175,9 @@ def schnet_extract_E(self, dataset):
     print_x_out_of_y(f'Extracting forces', N, N, True)
     return np.array(E)
 
+def schnet_indices(self, dataset):
+    return np.arange(len(dataset))
+
 def varfunc_dummy(self, dataset):
 
     return np.zeros(len(dataset['R']))

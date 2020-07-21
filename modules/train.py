@@ -38,18 +38,24 @@ class TrainHandler(ClusterErrorHandler):
 
 			new_indices = self.find_problematic_indices()
 
+			if os.path.exists(old_model_path):
+				if os.path.isdir(old_model_path):
+					shutil.rmtree(old_model_path)
+				else:
+					os.remove(old_model_path)
+
 			shutil.move(model_path, old_model_path)
 
 			tr_ind = list(self.training_indices) + list(new_indices)
 			self.training_indices = tr_ind
 
-			# free up memory
-			if hasattr(self.curr_model, 'glob_id'):
-				glob_id = self.curr_model.glob_id
-				if (glob_id is not None) and ("globs" in globals()):
-					global globs
-					if len(globs)>glob_id:
-						globs[glob_id] = None
+			# # free up memory, sGDML
+			# if hasattr(self.curr_model, 'glob_id'):
+			# 	glob_id = self.curr_model.glob_id
+			# 	if (glob_id is not None) and ("globs" in globals()):
+			# 		global globs
+			# 		if len(globs)>glob_id:
+			# 			globs[glob_id] = None
 
 			self.curr_model = None 
 			self.train_load_model(model_path, tr_ind, old_model_path)
