@@ -20,6 +20,9 @@ class ClusterErrorHandler(ClusterHandler):
 				self.curr_model, self.training_indices = self.call_para(
 					'train_models','load_func', args = [self, init]
 					)
+				if self.curr_model is None:
+					self.args['init'] = self.training_indices
+
 			else:
 				print_error(f'Could not find model at invalid path {init}')
 		else:
@@ -59,7 +62,6 @@ class ClusterErrorHandler(ClusterHandler):
 				args = [self, indices, model_path, old_model_path]
 				)
 
-			print(model_path)
 			self.curr_model, self.training_indices = self.call_para(
 				'train_models','load_func', args = [self, model_path]
 				)

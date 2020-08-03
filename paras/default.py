@@ -2,6 +2,7 @@
 
 parameters={	
 	'n_cores':-2, # negative numbers means number of total cores minus 
+	'remove_temp_files':True,
 
 	'load_dataset':{
 		'post_processing':None,

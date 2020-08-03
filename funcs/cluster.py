@@ -1,6 +1,7 @@
 from util import*
 import util
 from sklearn.cluster import MiniBatchKMeans
+from sklearn.cluster import KMeans
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.metrics.pairwise import euclidean_distances
 from functools import partial 
@@ -137,7 +138,6 @@ def agglomerative_clustering(self,indices,scheme_index):
 	#divide rest into clusters
 	#using para['cluster_choice_criterion']
 	#+ni to find the old index back from entire dataset
-	#print("Clustering rest of data...")`
 	#outs=np.trunc(np.linspace(0,len(data_rest),99))
 
 	l_data_rest=len(data_rest)
@@ -222,10 +222,16 @@ def kmeans_clustering(data_base,indices,clustering_index):
 	print_ongoing_process("Preparing KMeans",True)
 
 	print_ongoing_process("Proceed to clustering")
-	cluster_labels=MiniBatchKMeans(n_clusters=n_clusters,init="k-means++").fit_predict(data)
+	# cluster_labels=MiniBatchKMeans(n_clusters=n_clusters,init="k-means++").fit_predict(data)
+	cluster_labels=KMeans(n_clusters=n_clusters,init="k-means++").fit_predict(data)
+
 
 	for i in range(n_clusters):
-		ind=np.concatenate(np.argwhere(cluster_labels==i).tolist())
+		argwhere = np.argwhere(cluster_labels==i)
+		if len(argwhere) < 1:
+			continue 
+		ind = np.concatenate(argwhere).tolist()
+
 		#convert back to initial set of indices
 		#no need here
 		cluster_ind.append(ind)
@@ -254,7 +260,6 @@ def cluster_do(self,scheme, init_ind = None):
  	
 	print_cluster_step(1,len(scheme))
 	cl_ind=self.call_para('clusters',index,'type',args=[self,init_ind,index])
-
 
 	#perform further clusterisations  
 	for i in range(1,len(scheme)):

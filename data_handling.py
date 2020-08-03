@@ -142,15 +142,13 @@ def schnet_extract_F_concat(self, dataset):
 
             F = np.load(self.dataset_path.replace('.db', '.npz'))['F']
             return F.reshape((N, -1))
-
-
-
+            
     F = []
     for i in range(N):
         print_x_out_of_y(f'Extracting forces', i, N)
         F.append( d[i]['forces'].numpy())
-        
     print_x_out_of_y(f'Extracting forces', N, N, True)
+
     return np.array(F).reshape((N, -1))
 
 def schnet_extract_E(self, dataset):

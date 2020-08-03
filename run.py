@@ -378,7 +378,8 @@ class MainHandler():
         self.delete_temp()
 
     def delete_temp(self):
-        shutil.rmtree(self.temp_dir)
+        if self.call_para('remove_temp_files'):
+            shutil.rmtree(self.temp_dir)
 
     def load_dataset(self):
         path=self.args['dataset_file']

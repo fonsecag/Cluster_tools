@@ -21,13 +21,8 @@ parameters={
 		'init_scheme':[0, 1],
 		#indices below define the clustering scheme
 		0:{
-			'type':'func:agglomerative_clustering', 
+			'type':'func:kmeans_clustering',
 			'n_clusters':10,
-			'initial_number':20000,
-			'custom': False, ## distance_matrix_func and linkage only active if True
-			'distance_matrix_function':'func:distance_matrix_euclidean',
-			'linkage':'complete',
-			'cluster_choice_criterion':'func:smallest_max_distance_euclidean',
 			'var_index':0,
 			},
 		1:{

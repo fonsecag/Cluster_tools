@@ -56,10 +56,9 @@ def mean_absolute_error(self, x,y):
 def root_mean_squared_error(self, x,y):
 	# print(f'{np.average(x)} {np.average(y)} root_mean_squared_error')
 	from sklearn.metrics import mean_squared_error as MSE
+
 	err=MSE(np.array(x),np.array(y))
 	return np.sqrt(err)
-
-
 
 def root_mean_squared_error_atom_wise(self, x,y):
 	# print(f'{np.average(x)} {np.average(y)} root_mean_squared_error')

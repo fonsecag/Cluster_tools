@@ -233,7 +233,7 @@ def sgdml_path_predict_F(self, model_path, input_var, batch_size):
 
 def get_sgdml_training_set(self, model):
 	print(model.__dict__.keys())
-	sys.exit()
+	# sys.exit()
 
 ### SchNet ###
 
@@ -280,9 +280,10 @@ def schnet_train_default(
 		all_ind = np.delete(all_ind, train_ind)
 
 		# val
-		val_ind = np.random.choice(
-			all_ind, n_val, replace = False)
-		all_ind = np.delete(all_ind, val_ind)
+		val_ind_ind = np.random.choice(
+			np.arange(len(all_ind)), n_val, replace = False)
+		val_ind = all_ind[val_ind_ind]
+		all_ind = np.delete(all_ind, val_ind_ind)
 
 		split_dict = {
 			'train_idx': train_ind,
@@ -317,8 +318,9 @@ def schnet_train_default(
 	i['n_gaussians'], i['n_interactions'] = n_gaussians, n_interactions
 	i['cutoff'], i['learning_rate']       = cutoff, learning_rate
 	i['rho_tradeoff'], i['patience']      = rho_tradeoff, patience
-	i['n_epochs']                         = n_epochs
+	i['n_epochs'], i['n_val']             = n_epochs, n_val
 	print_table('Parameters', None, None, i, width = 20)
+	print()
 
 	train_loader = spk.AtomsLoader(
 		train, shuffle = True, batch_size = batch_size)
@@ -440,10 +442,19 @@ def schnet_train_default(
 
 def load_schnet_model(self, path):
 	import torch
+
+	if path.split('.')[-1] == 'npz':
+		a = np.load(path)
+		if 'train_idx' not in dict(a).keys():
+			print_error(f'Given split file {path} did not contain train_idx.')
+
+		return None, a['train_idx']
+
 	if not os.path.isdir(path):
 		print_error(f'{path} is not a directory. SchNet models need to be a '\
 			'directory containing the model as "model" and the split file as '\
-			'"split.npz"')
+			'"split.npz". Alternatively, it can be the split file on its own '\
+			' in the .npz format to retrain from a given training set.')
 
 	split, model = os.path.join(path, 'split.npz'), os.path.join(path, 'model')
 
@@ -453,14 +464,20 @@ def load_schnet_model(self, path):
 	if not os.path.exists(model):
 		print_error(f'"model" file not found in {path}')
 
-	m = torch.load(model)
+	if torch.cuda.is_available():
+		m = torch.load(model, map_location = torch.device('cuda'))
+	else:
+		m = torch.load(model, map_location = torch.device('cpu'))
 	training_indices = np.load(split)['train_idx']
 	
 	return m, training_indices
 
 def schnet_predict_F(self, indices):
 	m = self.curr_model
+
 	test = self.dataset.create_subset(indices)
+
+	ind0 = indices[0]
 
 	import schnetpack as spk 
 	test_loader = spk.AtomsLoader(test, batch_size = 100)
@@ -473,8 +490,14 @@ def schnet_predict_F(self, indices):
 		device = 'cpu'
 
 	for count, batch in enumerate(test_loader):
+		print(f'{count}/{len(test_loader)}', end = '\r')
+
 		batch = {k: v.to(device) for k, v in batch.items()}
 		preds.append( m(batch)['forces'].detach().cpu().numpy())
+
+		f = preds[-1]
+		f_r = batch['forces'].detach().cpu().numpy()
+		d = f - f_r 
 
 	F = np.concatenate(preds)
 	return F.reshape(len(F), -1)
