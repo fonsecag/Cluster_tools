@@ -195,7 +195,6 @@ def agglomerative_clustering(self,indices,scheme_index):
 
 	return cluster_ind
 
-
 def single_cluster(self, indices, scheme_index):
 
 	if indices is not None:
@@ -208,9 +207,15 @@ def single_cluster(self, indices, scheme_index):
 
 		return [np.arange(len(data))]
 
+def cl_first_point(self, indices, schem_index):
+	if indices is not None:
+		return [[indices[0]]]
 
+	else:
+		return [[0]]
 
 def kmeans_clustering(data_base,indices,clustering_index):
+	
 	print_ongoing_process("Preparing KMeans")
 	para=data_base.para['clusters'][clustering_index]
 	data,n_clusters,cluster_ind=None,para["n_clusters"],[]
@@ -316,7 +321,7 @@ def within_cluster_weighted_err_N(self, cl_ind, err, N):
 	weights=(mse/np.sum(mse))*(pop/np.sum(pop))
 	Ns=weighted_distribution(N, weights)
 
-	for  i in range(len(cl_ind)):
+	for i in range(len(cl_ind)):
 		ind=np.array(cl_ind[i])
 		cl_err=err[ind]
 		ni=Ns[i]

@@ -9,6 +9,11 @@ def load_sgdml_model(self, path):
 	m = GDMLPredict(a)
 	return m, training_indices
 
+def load_npz_prepredicted(self, path):
+	m = np.load(path)
+	training_indices = []
+	return m, training_indices
+
 def sgdml_all_default(train_indices, args):
 	from sgdml.cli import create, train, validate, select, test
 	from sgdml.utils import ui, io
@@ -92,6 +97,10 @@ def sgdml_all_default(train_indices, args):
 	if "glob" in globals():
 		global glob
 		del glob
+
+def npz_prepredicted_F(self, indices):
+	F = self.curr_model['F'][indices]
+	return F.reshape(len(F), -1)
 
 def sgdml_predict_F(self, R):
 	model = self.curr_model 
@@ -495,10 +504,6 @@ def schnet_predict_F(self, indices):
 		batch = {k: v.to(device) for k, v in batch.items()}
 		preds.append( m(batch)['forces'].detach().cpu().numpy())
 
-		f = preds[-1]
-		f_r = batch['forces'].detach().cpu().numpy()
-		d = f - f_r 
-
 	F = np.concatenate(preds)
 	return F.reshape(len(F), -1)
 
@@ -517,6 +522,8 @@ def schnet_predict_E(self, indices):
 		device = 'cpu'
 
 	for count, batch in enumerate(test_loader):
+		print(f'{count}/{len(test_loader)}', end = '\r')
+
 		batch = {k: v.to(device) for k, v in batch.items()}
 		preds.append(m(batch)['energy'].detach().cpu().numpy())
 

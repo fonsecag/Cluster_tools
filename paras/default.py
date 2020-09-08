@@ -1,12 +1,22 @@
 
 
 parameters={	
-	'n_cores':-2, # negative numbers means number of total cores minus 
+	'n_cores':-2, 
+	# The number of cores to use for (some) functions
+	# Most of the libraries/functions used in this work handle this on their own
+	# This parameter only affects handmade functions where multiprocessing is
+	# handled manually.
+	# Negative numbers means number of total cores minus that number
+
+
 	'remove_temp_files':True,
+	# A temp folder is created during the execution of many commands, containing
+	# temporary files and folders. This is usally deleted after the program is
+	# done. Setting this option to False avoids the deletion of the temp folder
 
 	'load_dataset':{
-		'post_processing':None,
-		'post_processing_args':[],
+		'post_processing':None, 
+		'post_processing_args':[], 
 
 		'schnet_preprocessed_npz':False,
 
@@ -44,6 +54,7 @@ parameters={
 			'type':'func:agglomerative_clustering', 
 			'n_clusters':100,
 			'initial_number':10000,
+			'custom':False,
 			'distance_matrix_function':'func:distance_matrix_euclidean',
 			'linkage':'complete',
 			'cluster_choice_criterion':'func:smallest_max_distance_euclidean',
@@ -350,7 +361,7 @@ parameters={
 	'fine_clustering':{
 		'fine_indices_func':'func:cluster_above_mse',
 		'fine_indices_func_args':[1.1],
-		'clustering_scheme':[0],
+		'clustering_scheme':[2],
 
 		'indices_func':'func:within_cluster_weighted_err_N', 
 		'indices_func_args':[],

@@ -176,6 +176,9 @@ def schnet_extract_E(self, dataset):
 def schnet_indices(self, dataset):
     return np.arange(len(dataset))
 
+def npz_indices(self, dataset):
+    return np.arange(len(dataset['R']))
+
 def varfunc_dummy(self, dataset):
 
     return np.zeros(len(dataset['R']))

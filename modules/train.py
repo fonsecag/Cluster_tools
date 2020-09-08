@@ -13,6 +13,7 @@ class TrainHandler(ClusterErrorHandler):
 		# -1 because no error calc on its own, no plotting
 
 		self.n_stages = self.n_main_stages + self.n_substages
+		self.info['training_indices'] = []
 
 	# n_substages = ClusterHandler.n_substages + 1  # needs be dynamic
 
@@ -22,7 +23,7 @@ class TrainHandler(ClusterErrorHandler):
 		# (self, dataset_tuple, n_train, model_path, sgdml_args)
 		ext = self.call_para('train_models','model_ext')
 		model_path = os.path.join(self.storage_dir,f'model{ext}')
-		old_model_path = os.path.join(self.storage_dir,f'old_model{ext}')
+		old_model_path = os.path.join(self.storage_dir,f'old_model')
 
 		## INITIAL MODEL
 		self.init_model()
@@ -30,6 +31,7 @@ class TrainHandler(ClusterErrorHandler):
 		self.train_load_model(model_path, self.args['init'])
 		if not os.path.exists(model_path):
 			shutil.copy( self.args['init'], model_path)
+		self.info['training_indices'].append(self.training_indices)
 
 		## ACTUAL ITERATIONS
 		n_steps = self.args['n_steps']
@@ -44,7 +46,9 @@ class TrainHandler(ClusterErrorHandler):
 				else:
 					os.remove(old_model_path)
 
-			shutil.move(model_path, old_model_path)
+			# toad: do better
+			save_path = f'{old_model_path}_{len(self.training_indices)}{ext}'
+			shutil.move(model_path, save_path)
 
 			tr_ind = list(self.training_indices) + list(new_indices)
 			self.training_indices = tr_ind
@@ -58,7 +62,8 @@ class TrainHandler(ClusterErrorHandler):
 			# 			globs[glob_id] = None
 
 			self.curr_model = None 
-			self.train_load_model(model_path, tr_ind, old_model_path)
+			self.train_load_model(model_path, tr_ind, save_path)
+			self.info['training_indices'].append(self.training_indices)
 
 	def find_problematic_indices(self):
 		self.calculate_errors(extended = False, sample_wise = True)

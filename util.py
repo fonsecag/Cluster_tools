@@ -9,8 +9,8 @@ mpl_logger = logging.getLogger('matplotlib')
 mpl_logger.setLevel(logging.ERROR)
 logging.disable(logging.DEBUG)
 
-UI_COLUMN_WIDTH=10
-SEPARATOR_CHARACTER_1="#"
+UI_COLUMN_WIDTH = 10
+SEPARATOR_CHARACTER_1 = "#"
 
 #UNBUFFER PRINT
 _print=functools.partial(print, flush=True)
@@ -58,7 +58,6 @@ def print_x_out_of_y_eta(s,x,y,eta,finish=False,width=None):
 		eta=f"(ETA {eta:.1f}s)"
 		_print(f"{bcolors.OKBLUE}{a:<{width}}{bcolors.ENDC}{s}"
 			+f"{bcolors.FLASH}{'...':<{rem_len}}{bcolors.ENDC}{bcolors.WHITE}{eta:>10}{bcolors.ENDC}",end="\r")
-
 
 def print_subtitle(name):
 	_print(f"\n{bcolors.LIGHTGREY}{bcolors.UNDERLINE}{name}{bcolors.ENDC}")
@@ -133,7 +132,6 @@ def print_warning(s):
 
 def print_info(s):
 	_print(f"{bcolors.WHITE}{'(INFO)':<{UI_COLUMN_WIDTH}}{bcolors.ENDC}{str(s)}")
-
 
 def print_error(s):
 	_print(f"{bcolors.FAIL}{'(ERR)':<{UI_COLUMN_WIDTH}}{str(s)}{bcolors.ENDC}")
